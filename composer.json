@@ -25,11 +25,11 @@
     "docs": "https://docs.typo3.org/typo3cms/extensions/dlf/"
   },
   "repositories": [
-    { "type": "composer", "url": "https://composer.typo3.org/" },
     {
       "type": "vcs",
       "url": "git@git.sc.uni-leipzig.de:ubl/bdd_dev/cmr/php-iiif-prezi-reader.git"
-    }
+    },
+    { "type": "composer", "url": "https://composer.typo3.org/" }
   ],
   "require": {
     "php": "^7.0",
