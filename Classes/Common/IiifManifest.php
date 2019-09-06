@@ -272,7 +272,23 @@ final class IiifManifest extends Document
                     if (isset($thumbnailUrl)) {
                         $this->physicalStructureInfo[$physSeq[0]]['files'][$fileUseThumbs] = $thumbnailUrl;
                     }
-                    $image = $canvas->getImageAnnotations()[0];
+                    $images = $canvas->getImageAnnotations();
+                    if (sizeof($images) > 1) {
+                        $this->physicalStructureInfo[$elements[$canvasOrder]]['canvas'] = [];
+                        $this->physicalStructureInfo[$elements[$canvasOrder]]['canvas']['width'] = $canvas->getWidth();
+                        $this->physicalStructureInfo[$elements[$canvasOrder]]['canvas']['height'] = $canvas->getHeight();
+                        $this->physicalStructureInfo[$elements[$canvasOrder]]['canvas']['images'] = [];
+                        foreach ($images as $canvasImage) {
+                            $canvasImage->getTargetResourceId();
+                            $label = $canvasImage->getLabelForDisplay();
+                            $this->physicalStructureInfo[$elements[$canvasOrder]]['canvas']['images'][] = [
+                                'target' => [],
+                                'label' => $label,
+                                'imageService' => $canvasImage->getBody()->getService(),
+                            ];
+                        }
+                    }
+                    $image = $images[0];
                     // put images in all non specific filegroups
                     if (isset($fileUses)) {
                         foreach ($fileUses as $fileUse) {
