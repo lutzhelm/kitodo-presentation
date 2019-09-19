@@ -595,7 +595,10 @@ dlfViewer.prototype.addMagnifier = function (rotation) {
     var layerProj = new ol.proj.Projection({
         code: 'kitodo-image',
         units: 'pixels',
-        extent: extent
+        extent: extent,
+        getPointResolution: function(resolution, coordinate) {
+            return resolution;
+        }
     });
 
     this.ov_view = new ol.View({

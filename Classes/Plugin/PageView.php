@@ -15,6 +15,7 @@ use Kitodo\Dlf\Common\Helper;
 use Kitodo\Dlf\Common\IiifManifest;
 use Ubl\Iiif\Presentation\Common\Model\Resources\ManifestInterface;
 use Ubl\Iiif\Presentation\Common\Vocabulary\Motivation;
+use Ubl\Iiif\Services\AbstractImageService;
 
 /**
  * Plugin 'Page View' for the 'dlf' extension
@@ -202,6 +203,38 @@ class PageView extends \Kitodo\Dlf\Common\AbstractPlugin {
             } else {
                 Helper::devLog('File not found in fileGrp "'.$fileGrp.'"', DEVLOG_SEVERITY_WARNING);
             }
+        }
+        if ($this->doc instanceof IiifManifest && array_key_exists('canvas', $this->doc->physicalStructureInfo[$this->doc->physicalStructure[$page]])) {
+            $canvasObject = $this->doc->getIiif()->getContainedResourceById($this->doc->physicalStructureInfo[$this->doc->physicalStructure[$page]]['canvas']);
+            $canvas = [];
+            $canvas['width'] = $canvasObject->getWidth();
+            $canvas['height'] = $canvasObject->getHeight();
+            $canvas['images'] = [];
+            foreach ($canvasObject->getImageAnnotations() as $canvasImage) {
+                $target = null;
+                if (($selector = $canvasImage->getOnSelector()) != null) {
+                    $target = [$selector->getX(), $selector->getY(), $selector->getWidth(), $selector->getHeight()];
+                }
+                $iiifImage = null;
+                $isImageService = false;
+                if ($canvasImage->getBody() != null && $canvasImage->getBody()->getService() != null && $canvasImage->getBody()->getService() instanceof AbstractImageService) {
+                    // body / resource of image annotation references an actual IIIF image service
+                    $iiifImage = $canvasImage->getBody()->getService()->getId();
+                    $isImageService = true;
+                } elseif ($canvasImage->getBody() != null) {
+                    // body / resource of image annotation probably references a static image
+                    $iiifImage = $canvasImage->getBody()->getId();
+                }
+                $canvas['images'][] = [
+                    'target' => $target,
+                    'label' => $canvasImage->getLabelForDisplay() == null ? $this->pi_getLL('noImageAnnotationLabel', 'No label', TRUE) : $canvasImage->getLabelForDisplay(),
+                    'image' => ['url' => $canvasImage->getBody()->getService()->getId()],
+                    'isImageService' => $isImageService,
+                    'width' => $canvasImage->getBody()->getWidth(),
+                    'height' => $canvasImage->getBody()->getHeight(),
+                ];
+            }
+            $image['canvas'] = $canvas;
         }
         return $image;
     }

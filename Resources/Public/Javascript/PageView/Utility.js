@@ -53,9 +53,11 @@ dlfUtils.createOl3Layers = function (imageSourceObjs, opt_origin) {
     var origin = opt_origin !== undefined ? opt_origin : null,
         widthSum = 0,
         offsetWidth = 0,
-        layers = [];
+        layers = [],
+        imageIndex = 0;
 
     imageSourceObjs.forEach(function (imageSourceObj) {
+
         var tileSize = void 0;
         if (widthSum > 0) {
             // set offset width in case of multiple images
@@ -68,7 +70,89 @@ dlfUtils.createOl3Layers = function (imageSourceObjs, opt_origin) {
         var extent = [offsetWidth, -imageSourceObj.height, imageSourceObj.width + offsetWidth, 0],
             layer = void 0;
 
-        if (imageSourceObj.mimetype === dlfUtils.CUSTOM_MIMETYPE.ZOOMIFY) {
+        if (imageSourceObj.canvasImages != null) {
+            var proj = new ol.proj.Projection({
+                code: 'kitodo-image',
+                units: 'pixels',
+                extent: extent,
+                getPointResolution: function(resolution, coordinate) {
+                    return resolution;
+                }
+            });
+            var cLayer = void 0;
+            imageSourceObj.canvasImages.forEach(function(imageInfo) {
+                var    target = (imageInfo.canvasInformation.target == null) ? [0, 0, imageSourceObj.width, imageSourceObj.height] : imageInfo.canvasInformation.target,
+                    sizeExtent = [0, 0 - imageInfo.height, imageInfo.width, 0],
+                    xFactor = imageInfo.width / target[2],
+                    yFactor = imageInfo.height / target[3],
+                    projectedHeight = imageSourceObj.height * yFactor,
+                    projectedWidth = imageSourceObj.width * xFactor,
+                    projectedExtent = [0, 0 - projectedHeight, projectedWidth, 0],
+                    gridProjection = undefined;
+                if (xFactor == 1 && yFactor == 1 && target[0] == 0 && target[1] == 0) {
+                    gridProjection = proj;
+                } else {
+                    gridProjection = new ol.proj.Projection({
+                        code: 'pixels-grid-'+imageIndex,
+                        units: 'pixels',
+                        extent: projectedExtent,
+                        worldExtent: projectedExtent,
+                        getPointResolution: function(resolution, coordinates) {
+                            return resolution * xFactor;
+                        }
+                    });
+                    imageIndex++;
+                    ol.proj.addCoordinateTransforms(
+                        proj,
+                        gridProjection,
+                        function(coordinate) {
+                            return [
+                                (coordinate[0] - target[0]) * xFactor,
+                                (coordinate[1] + target[1]) * yFactor
+                            ];
+                        },
+                        function(coordinate) {
+                            return [
+                                (coordinate[0] / xFactor) + target[0],
+                                (coordinate[1] / yFactor) - target[1]
+                            ];
+                        },
+                    );
+                }
+                imageIndex++;
+                var cLayer;
+                if (imageInfo.mimetype === dlfUtils.CUSTOM_MIMETYPE.IIIF) {
+
+                    var quality = imageInfo.qualities !== undefined && imageInfo.qualities.length > 0
+                        ? $.inArray('color', imageInfo.qualities) >= 0
+                            ? 'color'
+                            : $.inArray('native', imageInfo.qualities) >= 0
+                                ? 'native'
+                                : 'default'
+                        : 'default';
+
+                    cLayer = new ol.layer.Tile({
+                        source: new dlfViewerSource.IIIF({
+                            url: imageInfo.src,
+                            version: imageInfo.version,
+                            size: [imageInfo.width, imageInfo.height],
+                            extend: sizeExtent,
+                            crossOrigin: origin,
+                            resolutions: imageInfo.resolutions,
+                            tileSize: imageInfo.tilesize,
+                            sizes: imageInfo.sizes,
+                            format: 'jpg',
+                            quality: quality,
+                            supports: imageInfo.supports,
+                            offset: [offsetWidth, 0],
+                            projection: gridProjection
+                        }),
+                        zDirection: -1
+                    });
+                }
+                layers.push(cLayer);
+            });
+        } else if (imageSourceObj.mimetype === dlfUtils.CUSTOM_MIMETYPE.ZOOMIFY) {
             // create zoomify layer
             layer = new ol.layer.Tile({
                 source: new ol.source.Zoomify({
@@ -141,7 +225,9 @@ dlfUtils.createOl3Layers = function (imageSourceObjs, opt_origin) {
                 })
             });
         }
-        layers.push(layer);
+        if (layer != null) {
+            layers.push(layer);
+        }
 
         // add to cumulative width
         widthSum += imageSourceObj.width;
@@ -174,7 +260,10 @@ dlfUtils.createOl3View = function (images) {
     var proj = new ol.proj.Projection({
         code: 'kitodo-image',
         units: 'pixels',
-        extent: extent
+        extent: extent,
+        getPointResolution: function(resolution, coordinate) {
+            return resolution;
+        }
     });
 
     // define view
@@ -215,16 +304,45 @@ dlfUtils.fetchImageData = function (imageSourceObjs) {
      */
     var imageSourceData = [],
         loadCount = 0,
+        expectedObjects = imageSourceObjs.length,
         finishLoading = function finishLoading() {
         loadCount += 1;
 
-        if (loadCount === imageSourceObjs.length) {
+        if (loadCount === expectedObjects) {
             deferredResponse.resolve(imageSourceData);
         }
     };
 
     imageSourceObjs.forEach(function (imageSourceObj, index) {
-        if (imageSourceObj.mimetype === dlfUtils.CUSTOM_MIMETYPE.ZOOMIFY) {
+        if (imageSourceObj.canvas !== undefined) {
+            expectedObjects += imageSourceObj.canvas.images.length - 1;
+            imageSourceData[index]= {
+                width: imageSourceObj.canvas.width,
+                height: imageSourceObj.canvas.height,
+                canvasImages: []
+            };
+            imageSourceObj.canvas.images.forEach(function(imageAnnotation, cindex) {
+                var canvasInformation = {
+                    target: imageAnnotation.target,
+                    label: imageAnnotation.label
+                };
+                if (imageAnnotation.isImageService) {
+                    dlfUtils.getIIIFResource(imageAnnotation.image)
+                        .done(function (imageSourceDataObj) {
+                            imageSourceDataObj.canvasInformation = canvasInformation;
+                            imageSourceData[index].canvasImages[cindex] = imageSourceDataObj;
+                            finishLoading();
+                        });
+                } else {
+                    dlfUtils.fetchStaticImageData(image)
+                        .done(function (imageSourceDataObj) {
+                            imageSourceDataObj.canvasInformation = canvasInformation;
+                            imageSourceData[index].canvasImages[cindex] = imageSourceDataObj;
+                            finishLoading();
+                        });
+                }
+            });
+        } else if (imageSourceObj.mimetype === dlfUtils.CUSTOM_MIMETYPE.ZOOMIFY) {
             dlfUtils.fetchZoomifyData(imageSourceObj)
                 .done(function (imageSourceDataObj) {
                     imageSourceData[index] = imageSourceDataObj;
@@ -304,7 +422,7 @@ dlfUtils.getIIIFResource = function getIIIFResource(imageSourceObj) {
     }).done(cb).fail(error);
 
     function cb(data) {
-        var mimetype = imageSourceObj.mimetype,
+        var mimetype = dlfUtils.CUSTOM_MIMETYPE.IIIF,
             uri,
             imageResource;
         if (dlfUtils.supportsIIIF(data)) {

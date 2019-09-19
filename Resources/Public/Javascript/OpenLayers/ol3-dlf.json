@@ -50,6 +50,7 @@
     "ol.layer.Tile",
     "ol.layer.Vector",
     "ol.layer.Vector#getSource",
+    "ol.proj.addCoordinateTransforms",
     "ol.proj.Projection",
     "ol.proj.Projection#getExtent",
     "ol.Map",

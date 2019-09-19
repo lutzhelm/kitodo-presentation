@@ -272,23 +272,7 @@ final class IiifManifest extends Document
                     if (isset($thumbnailUrl)) {
                         $this->physicalStructureInfo[$physSeq[0]]['files'][$fileUseThumbs] = $thumbnailUrl;
                     }
-                    $images = $canvas->getImageAnnotations();
-                    if (sizeof($images) > 1) {
-                        $this->physicalStructureInfo[$elements[$canvasOrder]]['canvas'] = [];
-                        $this->physicalStructureInfo[$elements[$canvasOrder]]['canvas']['width'] = $canvas->getWidth();
-                        $this->physicalStructureInfo[$elements[$canvasOrder]]['canvas']['height'] = $canvas->getHeight();
-                        $this->physicalStructureInfo[$elements[$canvasOrder]]['canvas']['images'] = [];
-                        foreach ($images as $canvasImage) {
-                            $canvasImage->getTargetResourceId();
-                            $label = $canvasImage->getLabelForDisplay();
-                            $this->physicalStructureInfo[$elements[$canvasOrder]]['canvas']['images'][] = [
-                                'target' => [],
-                                'label' => $label,
-                                'imageService' => $canvasImage->getBody()->getService(),
-                            ];
-                        }
-                    }
-                    $image = $images[0];
+                    $image = $canvas->getImageAnnotations()[0];
                     // put images in all non specific filegroups
                     if (isset($fileUses)) {
                         foreach ($fileUses as $fileUse) {
@@ -299,6 +283,13 @@ final class IiifManifest extends Document
                     }
                     // populate structural metadata info
                     $elements[$canvasOrder] = $canvas->getId();
+                    // If there is more than one image annotation or the dimensions differ, we can't simply rely on the same structural info as in METS
+                    if (sizeof($canvas->getImageAnnotations()) > 1
+                        || $canvas->getWidth() != $image->getBody()->getWidth()
+                        || $canvas->getHeight() != $image->getBody()->getHeight()
+                        || $image->getOnSelector() != null) {
+                        $this->physicalStructureInfo[$elements[$canvasOrder]]['canvas'] = $canvas->getId();
+                    }
                     $this->physicalStructureInfo[$elements[$canvasOrder]]['id']=$canvas->getId();
                     $this->physicalStructureInfo[$elements[$canvasOrder]]['dmdId']=null;
                     $this->physicalStructureInfo[$elements[$canvasOrder]]['label']=$canvas->getLabelForDisplay();
