@@ -25,10 +25,6 @@
     "docs": "https://docs.typo3.org/typo3cms/extensions/dlf/"
   },
   "repositories": [
-    {
-      "type": "vcs",
-      "url": "git@git.sc.uni-leipzig.de:ubl/bdd_dev/cmr/php-iiif-prezi-reader.git"
-    },
     { "type": "composer", "url": "https://composer.typo3.org/" }
   ],
   "require": {
@@ -43,7 +39,7 @@
     "typo3/cms-css-styled-content": "^8.7.8",
     "typo3/cms-tstemplate": "^8.7.8",
     "pagemachine/typo3-composer-legacy-cli": "^1.0",
-    "ubl/php-iiif-prezi-reader": "dev-kitodo-improvements",
+    "ubl/php-iiif-prezi-reader": "0.3.0",
     "solarium/solarium": "^4.2"
   },
   "replace": {
